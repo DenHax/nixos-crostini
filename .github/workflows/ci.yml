@@ -18,22 +18,34 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-24
             arch: arm64
-          - runner: ubuntu-24.04
+          - runner: ubuntu-24
             arch: x86_64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v6.0.1
         with:
           persist-credentials: false
-      - uses: DeterminateSystems/determinate-nix-action@1d699fc25db3f9e079cd2f168ca007a4183389be  # v3.15.1
-      - uses: DeterminateSystems/flake-checker-action@3164002371bc90729c68af0e24d5aacf20d7c9f6  # v12
+
+      - name: Install Nix
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install linux \
+            --extra-conf "sandbox = false" \
+            --init none
+          echo "$HOME/.nix-profile/bin" >> $GITHUB_PATH
+          echo "NIX_PATH=nixpkgs=channel:nixpkgs-unstable" >> $GITHUB_ENV
+
+      - name: Setup Nix environment
+        run: |
+          mkdir -p ~/.config/nix
+          echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+          echo "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}" >> ~/.config/nix/nix.conf
 
       - run: nix flake check
       - run: nix build .#baguette-zimage
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: zimage-${{ matrix.arch }}
           path: result/*.zst
